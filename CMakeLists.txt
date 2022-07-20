@@ -4,6 +4,8 @@ project(VRMLConverter)
 
 find_package(VTK COMPONENTS
     CommonCore
+    ImagingGeneral
+    InteractionStyle
     IOExport
     IOLegacy
     RenderingCore
@@ -13,12 +15,20 @@ find_package(VTK COMPONENTS
     RenderingOpenGL2
 )
 
+find_package(ITK REQUIRED)
+include(${ITK_USE_FILE})
+
 if (NOT VTK_FOUND)
   message(FATAL_ERROR "Unable to find the VTK build folder.")
 endif()
 
+if (NOT ITK_FOUND)
+  message(FATAL_ERROR "Unable to find the ITK build folder.")
+endif()
+
+
 add_executable(${PROJECT_NAME} main.cxx)
-target_link_libraries(${PROJECT_NAME} PRIVATE ${VTK_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${VTK_LIBRARIES} ${ITK_LIBRARIES})
 
 # vtk_module_autoinit is needed
 vtk_module_autoinit(
