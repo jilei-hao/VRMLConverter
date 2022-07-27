@@ -84,6 +84,7 @@ int parse_color(
 void GetLabelColor(unsigned int label, uint8_t &r, uint8_t &g, uint8_t &b)
 {
   parse_color(ColorList[(label-1) % ColorListSize], r, g, b);
+  //std::cout << "Label[" << label << "] color=(" << +r << ',' << +g << ',' << +b << ")" << std::endl;
 }
 
 
@@ -125,14 +126,30 @@ void ConnectITKExporterToVTKImporter(
 
 int main (int argc, char* argv[])
 {
-  if (argc != 3)
+
+  std::cout << std::endl;
+  std::cout << "==========================" << std::endl;
+  std::cout << "VRML Converter v1.0.3" << std::endl;
+  std::cout << "==========================" << std::endl << std::endl;
+
+  if (argc != 3 && argc != 4)
   {
-    std::cerr << "Usage: VRMLConverter input.nii.gz output.vrml" << std::endl;
+    std::cerr << "Usage: VRMLConverter -s input.nii.gz output.vrml" << std::endl;
+    std::cerr << "-s: Optional, turn on smoothing. Smoothing is off no -s" << std::endl;
     return EXIT_FAILURE;
   }
 
-  const char *fninput = argv[1];
-  const char *fnoutput = argv[2];
+  bool doSmoothing = false;
+  if (argc == 4 && strcmp(argv[1], "-s") == 0)
+    doSmoothing = true;
+
+  const char *fninput = argv[argc - 2];
+  const char *fnoutput = argv[argc - 1];
+  
+
+  if (doSmoothing)
+    std::cout << "-- Smoothing is ON" << std::endl;
+  
   std::cout << "-- Input Filename: " << fninput << std::endl;
   std::cout << "-- Output Filename: " << fnoutput << std::endl;
 
@@ -186,15 +203,20 @@ int main (int argc, char* argv[])
     vtkSmartPointer<vtkImageData> vtkImageTail = fltVTKImport->GetOutput();
 
     // Smooth
-    vtkNew<vtkImageGaussianSmooth> fltSmooth;
-    fltSmooth->SetInputData(vtkImageTail);
-    fltSmooth->SetStandardDeviation(0.8, 0.8, 0.8);
-    fltSmooth->SetRadiusFactors(1.5, 1.5, 1.5);
-    fltSmooth->Update();
+    if (doSmoothing)
+      {
+      vtkNew<vtkImageGaussianSmooth> fltSmooth;
+      fltSmooth->SetInputData(vtkImageTail);
+      fltSmooth->SetStandardDeviation(0.8, 0.8, 0.8);
+      fltSmooth->SetRadiusFactors(1.5, 1.5, 1.5);
+      fltSmooth->Update();
+      vtkImageTail = fltSmooth->GetOutput();
+      }
+
 
     // Extract Polydata
     vtkNew<vtkMarchingCubes> fltMC;
-    fltMC->SetInputData(fltSmooth->GetOutput());
+    fltMC->SetInputData(vtkImageTail);
     fltMC->SetNumberOfContours(1);
     fltMC->SetValue(0, 0.5);
     fltMC->SetComputeGradients(false);
@@ -240,7 +262,7 @@ int main (int argc, char* argv[])
   exporter->SetFileName(fnoutput);
   exporter->Write();
 
-  std::cout << "-- VRML file exported" << std::endl;
+  std::cout << "-- VRML file exported" << std::endl << std::endl;
 
   return EXIT_SUCCESS;
 }
