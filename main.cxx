@@ -128,14 +128,14 @@ int main (int argc, char* argv[])
 {
 
   std::cout << std::endl;
-  std::cout << "==========================" << std::endl;
-  std::cout << "VRML Converter v1.0.3" << std::endl;
-  std::cout << "==========================" << std::endl << std::endl;
+  std::cout << "=================================" << std::endl;
+  std::cout << "   VRML Converter v1.0.3" << std::endl;
+  std::cout << "=================================" << std::endl << std::endl;
 
   if (argc != 3 && argc != 4)
   {
     std::cerr << "Usage: VRMLConverter -s input.nii.gz output.vrml" << std::endl;
-    std::cerr << "-s: Optional, turn on smoothing. Smoothing is off no -s" << std::endl;
+    std::cerr << "-s: Optional, turn on smoothing. Smoothing is off if no -s" << std::endl;
     return EXIT_FAILURE;
   }
 
