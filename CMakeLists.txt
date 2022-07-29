@@ -27,7 +27,7 @@ if (NOT ITK_FOUND)
 endif()
 
 
-add_executable(${PROJECT_NAME} main.cxx)
+add_executable(${PROJECT_NAME} main.cxx ColorTable.hxx)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${VTK_LIBRARIES} ${ITK_LIBRARIES})
 
 # vtk_module_autoinit is needed

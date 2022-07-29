@@ -24,68 +24,9 @@
 #include "itkBinaryThresholdImageFilter.h"
 #include "itkImageFileReader.h"
 #include "itkVTKImageExport.h"
-
 #include "itkMinimumMaximumImageCalculator.h"
+#include "ColorTable.hxx"
 
-// The Color list from SNAP
-// https://github.com/pyushkevich/itksnap/blob/312323ea9477ae8ee2c47dd20a93b621527d71d8/Logic/Common/ColorLabelTable.cxx#L39
-
-const size_t ColorListSize = 130;
-const char *ColorList[ColorListSize] = {
-  "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF",
-  "#FFEFD5", "#0000CD", "#CD853F", "#D2B48C", "#66CDAA", "#000080",
-  "#008B8B", "#2E8B57", "#FFE4E1", "#6A5ACD", "#DDA0DD", "#E9967A",
-  "#A52A2A", "#FFFAFA", "#9370DB", "#DA70D6", "#4B0082", "#FFB6C1",
-  "#3CB371", "#FFEBCD", "#FFE4C4", "#DAA520", "#008080", "#BC8F8F",
-  "#FF69B4", "#FFDAB9", "#DEB887", "#7FFF00", "#8B4513", "#7CFC00",
-  "#FFFFE0", "#4682B4", "#006400", "#EE82EE", "#EEE8AA", "#F0FFF0",
-  "#F5DEB3", "#B8860B", "#20B2AA", "#FF1493", "#191970", "#708090",
-  "#228B22", "#F8F8FF", "#F5FFFA", "#FFA07A", "#90EE90", "#ADFF2F",
-  "#4169E1", "#FF6347", "#FAF0E6", "#800000", "#32CD32", "#F4A460",
-  "#FFFFF0", "#7B68EE", "#FFA500", "#ADD8E6", "#FFC0CB", "#7FFFD4",
-  "#FF8C00", "#8FBC8F", "#DC143C", "#FDF5E6", "#FFFAF0", "#00CED1",
-  "#00FF7F", "#800080", "#FFFACD", "#FA8072", "#9400D3", "#B22222",
-  "#FF7F50", "#87CEEB", "#6495ED", "#F0E68C", "#FAEBD7", "#FFF5EE",
-  "#6B8E23", "#87CEFA", "#00008B", "#8B008B", "#F5F5DC", "#BA55D3",
-  "#FFE4B5", "#FFDEAD", "#00BFFF", "#D2691E", "#FFF8DC", "#2F4F4F",
-  "#483D8B", "#AFEEEE", "#808000", "#B0E0E6", "#FFF0F5", "#8B0000",
-  "#F0FFFF", "#FFD700", "#D8BFD8", "#778899", "#DB7093", "#48D1CC",
-  "#FF00FF", "#C71585", "#9ACD32", "#BDB76B", "#F0F8FF", "#E6E6FA",
-  "#00FA9A", "#556B2F", "#40E0D0", "#9932CC", "#CD5C5C", "#FAFAD2",
-  "#5F9EA0", "#008000", "#FF4500", "#E0FFFF", "#B0C4DE", "#8A2BE2",
-  "#1E90FF", "#F08080", "#98FB98", "#A0522D"};
-
-int parse_color(
-  const char* p, unsigned char& r, unsigned char& g, unsigned char& b)
-{
-  // Must be a seven-character string
-  if(strlen(p) != 7)
-    return EXIT_FAILURE;
-
-  int val[6];
-  for(int i = 0; i < 6; i++)
-    {
-    char c = p[i+1];
-    if(c >= 'A' && c <= 'F')
-      val[i] = 10 + (c - 'A');
-    else if(c >= 'a' && c <= 'f')
-      val[i] = 10 + (c - 'a');
-    else if(c >= '0' && c <= '9')
-      val[i] = c - '0';
-    else return -1;
-    }
-
-  r = 16 * val[0] + val[1];
-  g = 16 * val[2] + val[3];
-  b = 16 * val[4] + val[5];
-  return EXIT_SUCCESS;
-}
-
-void GetLabelColor(unsigned int label, uint8_t &r, uint8_t &g, uint8_t &b)
-{
-  parse_color(ColorList[(label-1) % ColorListSize], r, g, b);
-  //std::cout << "Label[" << label << "] color=(" << +r << ',' << +g << ',' << +b << ")" << std::endl;
-}
 
 
 template <class TImageType>
@@ -124,34 +65,76 @@ void ConnectITKExporterToVTKImporter(
     exporter->GetCallbackUserData());
 }
 
+
+void usage(std::ostream &os)
+{
+  os << "Usage:" << std::endl << std::endl;
+  os << "VRMLConverter -s -l labeldesc.txt input.nii.gz output.vrml" << std::endl << std::endl;
+  os << "Place all options before input and output filenames" << std::endl;
+  os << "-h                   Print usage" << std::endl;
+  os << "-s                   Optional. Turn on smoothing. Smoothing is off if no -s" << std::endl;
+  os << "-l labeldesc.txt     Optional. Use an ITK-SNAP Label Description file" << std::endl;
+  os << "                     to define output label colors. If option or file not provided, " << std::endl;
+  os << "                     program will use the default ITK-SNAP color table. " << std::endl;
+}
+
 int main (int argc, char* argv[])
 {
 
   std::cout << std::endl;
   std::cout << "=================================" << std::endl;
-  std::cout << "   VRML Converter v1.0.3" << std::endl;
+  std::cout << "   VRML Converter v1.0.4" << std::endl;
   std::cout << "=================================" << std::endl << std::endl;
 
-  if (argc != 3 && argc != 4)
-  {
-    std::cerr << "Usage: VRMLConverter -s input.nii.gz output.vrml" << std::endl;
-    std::cerr << "-s: Optional, turn on smoothing. Smoothing is off if no -s" << std::endl;
-    return EXIT_FAILURE;
-  }
-
   bool doSmoothing = false;
-  if (argc == 4 && strcmp(argv[1], "-s") == 0)
-    doSmoothing = true;
+  std::string fnlabel;
+
+  for (int i = 1; i < argc; ++i)
+  {
+    if (strcmp(argv[i], "-s") == 0)
+    {
+      doSmoothing = true;
+    }
+    else if (strcmp(argv[i], "-h") == 0)
+    {
+      usage(std::cout);
+      return EXIT_SUCCESS;
+    }
+    else if (strcmp(argv[i], "-l") == 0)
+    {
+      ++i;
+      if (i == argc)
+      {
+        usage(std::cerr);
+        return EXIT_FAILURE;
+      }
+
+      fnlabel = argv[i];
+    }
+  }
 
   const char *fninput = argv[argc - 2];
   const char *fnoutput = argv[argc - 1];
   
-
-  if (doSmoothing)
-    std::cout << "-- Smoothing is ON" << std::endl;
   
   std::cout << "-- Input Filename: " << fninput << std::endl;
   std::cout << "-- Output Filename: " << fnoutput << std::endl;
+  if (doSmoothing)
+    std::cout << "-- Smoothing is ON" << std::endl;
+
+  // Build a color table for color lookup
+  ColorTable *colorTable = nullptr;
+  if (fnlabel.size() > 0)
+  {
+    std::cout << "-- Using label description file for coloring: " << fnlabel << std::endl;
+    colorTable = new ColorTable(fnlabel.c_str());
+  }
+  else
+  {
+    std::cout << "-- Using default ITK-SNAP color table for coloring" << std::endl;
+    colorTable = new ColorTable();
+  }
+    
 
   // Read the image
   typedef uint16_t PixelType;
@@ -174,13 +157,14 @@ int main (int argc, char* argv[])
   PixelType min = fltMinMax->GetMinimum();
   PixelType max = fltMinMax->GetMaximum();
 
-  //sstd::cout << "Image Range: min=" << min << "; max=" << max << std::endl;
+  //std::cout << "Image Range: min=" << min << "; max=" << max << std::endl;
 
   // Processing each label
   typedef itk::BinaryThresholdImageFilter<ImageType, DoubleImageType> ThresholdFilter;
 
   vtkNew<vtkRenderer> renderer;
   uint8_t r, g, b;
+  float a;
 
   for (PixelType i = 1; i <= max; ++i)
     {
@@ -230,7 +214,7 @@ int main (int argc, char* argv[])
     mapper->SetInputData(fltMC->GetOutput());
     actor->SetMapper(mapper);
 
-    GetLabelColor(i, r, g, b);
+    colorTable->GetLabelColor(i, r, g, b, a);
     double dr = r/255.0, dg = g/255.0, db = b/255.0;
     //std::cout << "label=" << i << "; color=[" << + dr << ',' << +dg << ',' << +db << "]" << std::endl;
     vtkSmartPointer<vtkProperty> prop = actor->GetProperty();
