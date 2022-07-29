@@ -26,6 +26,7 @@
 #include "itkVTKImageExport.h"
 #include "itkMinimumMaximumImageCalculator.h"
 #include "ColorTable.hxx"
+#include "itksys/SystemTools.hxx"
 
 
 
@@ -89,6 +90,12 @@ int main (int argc, char* argv[])
   bool doSmoothing = false;
   std::string fnlabel;
 
+  if (argc < 2)
+  {
+    usage(std::cerr);
+    return EXIT_FAILURE;
+  }
+
   for (int i = 1; i < argc; ++i)
   {
     if (strcmp(argv[i], "-s") == 0)
@@ -115,6 +122,12 @@ int main (int argc, char* argv[])
 
   const char *fninput = argv[argc - 2];
   const char *fnoutput = argv[argc - 1];
+
+  if (!itksys::SystemTools::FileExists(fninput))
+  {
+    std::cerr << "Input File: " << fninput << " does not exist!" << std::endl;
+    return EXIT_FAILURE;
+  }
   
   
   std::cout << "-- Input Filename: " << fninput << std::endl;
@@ -126,6 +139,12 @@ int main (int argc, char* argv[])
   ColorTable *colorTable = nullptr;
   if (fnlabel.size() > 0)
   {
+    if (!itksys::SystemTools::FileExists(fnlabel.c_str()))
+    {
+      std::cerr << "Label Description File: " << fnlabel << " does not exist!" << std::endl;
+      return EXIT_FAILURE;
+    }
+
     std::cout << "-- Using label description file for coloring: " << fnlabel << std::endl;
     colorTable = new ColorTable(fnlabel.c_str());
   }
